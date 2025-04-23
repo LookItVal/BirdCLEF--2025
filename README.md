@@ -23,7 +23,7 @@ You can use either `conda` or `micromamba` to create and manage the virtual envi
     ```bash
     conda install kaggle ffmpeg pandas numpy
     # or
-    micromamba install kaggle ffmpeg pandas numpy
+    micromamba install kaggle ffmpeg ipykernel pandas numpy scipy cupy pytorch librosa
     ```
 
 ## Logging in to Kaggle and Downloading Data
