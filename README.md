@@ -21,9 +21,10 @@ You can use either `conda` or `micromamba` to create and manage the virtual envi
     ```
 3. Install the required packages:
     ```bash
-    conda install kaggle ffmpeg pandas numpy
+    conda install ffmpeg conda
+    conda install -c conda-forge librosa pydub
     # or
-    micromamba install kaggle ffmpeg ipykernel pandas numpy scipy cupy pytorch librosa
+    micromamba install kaggle ffmpeg conda pytorch librosa
     ```
 
 ## Logging in to Kaggle and Downloading Data
@@ -45,6 +46,7 @@ You can use either `conda` or `micromamba` to create and manage the virtual envi
     ```bash
     unzip birdclef-2025.zip -d data/
     ```
+    
 
 Ensure the `kaggle` CLI is installed and configured before attempting to download the data.
 
