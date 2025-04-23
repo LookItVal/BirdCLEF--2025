@@ -1,4 +1,4 @@
-# BirdCLEF+ 2025
+# [BirdCLEF+ 2025](https://www.kaggle.com/competitions/birdclef-2025)
 
 This project is designed to assist with bird sound analysis and classification. Below are the instructions to set up a virtual environment and install the required dependencies.
 
