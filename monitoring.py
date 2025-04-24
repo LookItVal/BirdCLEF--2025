@@ -1,39 +1,12 @@
 # Standard Library
 import time
-import os
-import sys
-import re
-import warnings
-import gc
-import pickle
-from datetime import datetime
-from typing import Generator, Optional, Callable, Tuple, Literal, List
-from contextlib import contextmanager
-from functools import lru_cache
-
-# Disable only FutureWarnings - they are annoying
-warnings.simplefilter(action='ignore', category=FutureWarning)
+from typing import Optional
 
 # Anaconda Libraries
-import pandas as pd
 import numpy as np
-import scipy as sp
 from IPython.display import display, HTML, DisplayHandle
-from sklearn.model_selection import train_test_split
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import classification_report, accuracy_score
-from sklearn.model_selection import cross_val_score
-from sklearn.neural_network import MLPClassifier
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 
-# Third Party Libraries
-from pydub import AudioSegment
-from pydub.utils import mediainfo
-
-
-number = Literal[int, float] # Define a type alias for number to be either int or float
+number = int | float
 
 def print_boundry(message: str="") -> None:
     """Print a message surrounded by a line of dashes with a total length of 100 characters
