@@ -32,8 +32,34 @@ def load_sound_file(file: str) -> Optional[AudioSegment]:
         return AudioSegment.from_file(file, format=mediainfo(file)['format_name'])
     except: # If the file cannot be loaded, print an error message and return None
         print(f"Error loading file {file}")
+        print(f'Mediainfo: {mediainfo(file)}')
         print(f'Format: {mediainfo(file)["format_name"]}')
         return None
+
+
+def window_sound(sound: AudioSegment, length: number=5, overlap: number=2.5) -> List[AudioSegment]:
+    """Window an audio signal into smaller segments of a specified length with a specified overlap.
+    The segments are returned as a list of AudioSegment objects.
+
+    Args:
+        sound (AudioSegment): The audio signal to be windowed.
+        length (number, optional): The length of the segments in seconds. Defaults to 5.
+        overlap (number, optional): The overlap between segments in seconds. Defaults to 2.5.
+    
+    Returns:
+        List[AudioSegment]: A list of the windowed audio segments.
+    """
+    length = int(length * 1000) # Convert the length to milliseconds
+    overlap = int(overlap * 1000) # Convert the overlap to milliseconds
+    sounds = [] # Initialize an empty list to store the windowed segments
+    while True:
+        if len(sound) < length:
+            break # If the remaining sound is shorter than the segment length, break the loop
+        sounds.append(sound[:length]) # Append the first segment to the list
+        if len(sound) < length + overlap: # If the remaining sound is shorter than the segment length plus the overlap
+            sound = sound[-length:] # Keep the last segment
+        sound = sound[length - overlap:] # Move the sound forward by the segment length minus the overlap
+    return sounds # Return the list of windowed segments
 
 
 def signal_to_audio(signal: ndarray, sample_rate: int=44100, denormalize: bool=False) -> AudioSegment:
@@ -48,7 +74,7 @@ def signal_to_audio(signal: ndarray, sample_rate: int=44100, denormalize: bool=F
     Returns:
         AudioSegment: The audio segment object created from the signal array.
     """
-    if isinstance(signal, cp.ndarray): # If the signal is a cupy array, convert it to a numpy array
+    if cp and isinstance(signal, cp.ndarray): # If the signal is a cupy array, convert it to a numpy array
         signal = cp.asnumpy(signal)
     if denormalize: # If the signal should be denormalized, scale it to the range of int16
         signal = signal * MAX_AMPLITUDE_AT_16_BIT
@@ -68,7 +94,7 @@ def normalize_signal(signal: ndarray, max_amplitude: Optional[number]=None) -> n
         cp.ndarray|np.ndarray: The normalized audio signal. Matches the input signal type.
     """
     math = np # Use numpy for CPU operations by default
-    if isinstance(signal, cp.ndarray):
+    if cp and isinstance(signal, cp.ndarray):
         math = cp # Use cupy for GPU operations if the signal is a cupy array
     if max_amplitude is None: # If the maximum amplitude is not provided find the maximum amplitude in the signal
         max_amplitude = math.max(math.abs(signal))
@@ -86,7 +112,7 @@ def normalize_decibels(signal: ndarray) -> ndarray:
         cp.ndarray|np.ndarray: The normalized signal. Return type matches the input signal type.
     """
     math = np # Use numpy for CPU operations by default
-    if isinstance(signal, cp.ndarray):
+    if cp and isinstance(signal, cp.ndarray):
         math = cp # Use CuPy for GPU operations if the signal is a cupy array
 
     signal = math.clip(signal, -120, 0) # Clip the signal to the range [-120,0]
@@ -107,7 +133,7 @@ def magnitude_to_db(signal: ndarray|number, epsilon: float=sys.float_info.epsilo
         cp.ndarray|np.ndarray|float|int: The magnitude of the audio signal in decibels. Return type matches the input signal type.
     """
     math = np # Use numpy for CPU operations by default
-    if isinstance(signal, cp.ndarray):
+    if cp and isinstance(signal, cp.ndarray):
         math = cp # Use cupy for GPU operations if the signal is a cupy array
     return 20 * math.log10(math.abs(signal + epsilon)) # Calculate the magnitude in decibels
 
@@ -127,7 +153,7 @@ def fourier_transform(signal: ndarray, sample_rate: int, cache: bool=False) -> T
      - **cp.ndarray|np.ndarray:** The frequency-signal of the Fourier Transform in decibels. Matches the input signal type.
     """    
     fft = sp.fft # Use scipy for CPU operations by default (faster than numpy at performing FFT)
-    if isinstance(signal, cp.ndarray):
+    if cp and isinstance(signal, cp.ndarray):
         fft = cufft # Use CuPy for GPU operations if the signal is a cupy array
     else:
         if cache: # If the cache is requested but the signal is not a cupy array, print a warning
@@ -140,7 +166,7 @@ def fourier_transform(signal: ndarray, sample_rate: int, cache: bool=False) -> T
         signal = signal / (n//2) # Normalize the signal
         return frequencies, signal # Return the frequencies and magnitudes of the Fourier Transform
     
-    if isinstance(signal, cp.ndarray) and (cache is False): # If the operation is on the GPU and cache is not requested
+    if cp and isinstance(signal, cp.ndarray) and (cache is False): # If the operation is on the GPU and cache is not requested
         with fft.get_fft_plan(signal, value_type='R2C'): # Create the FFT plan
             return rfft(signal, sample_rate) # Calculate the Fourier Transform using the plan
     else:
@@ -168,7 +194,7 @@ def group_frequencies(frequencies: ndarray,
     - **cp.ndarray|np.ndarray**: The magnitude value for the bin. Matches the input signal type.
     """
     math = np # Use numpy for CPU operations by default
-    if isinstance(frequencies, cp.ndarray):
+    if cp and isinstance(frequencies, cp.ndarray):
         math = cp # Use cupy for GPU operations if the signal is a cupy array
 
     if freq_bins is None: # If the frequency bins are not provided
@@ -176,8 +202,13 @@ def group_frequencies(frequencies: ndarray,
     bin_indicies = math.digitize(frequencies, freq_bins) - 1 # Group the frequencies into bins
     reduced_freq_signal = math.zeros(len(freq_bins)) # Initialize an array to store the maximum magnitude in each bin
     for i in range(len(freq_bins)): # Iterate through each bin
-        bin_values = freq_signal[bin_indicies == i] # Get the values in the bin
-        reduced_freq_signal[i] = math.sqrt(math.mean(math.abs(bin_values) ** 2)) # Calculate the RMS of the bin
+        bin_values = freq_signal[bin_indicies == i] # Get the values in the bin FIRST
+        if bin_values.size == 0: # THEN check if there are no values in the bin
+            reduced_freq_signal[i] = 0 # Assign a default value (e.g., 0) or handle as needed
+            continue # Skip to the next bin
+        # reduced_freq_signal[i] = math.sqrt(math.mean(math.abs(bin_values) ** 2)) # Calculate the RMS of the bin
+        reduced_freq_signal[i] = math.max(math.abs(bin_values)) # Calculate the maximum magnitude in the bin
+
     return freq_bins, reduced_freq_signal # Return the grouped frequencies and maximum magnitudes
 
 
@@ -227,7 +258,7 @@ def hz_to_mel(hz: ndarray|number) -> ndarray|number:
     --------
         mel = 2595 * log10(1 + hz / 700)
     """
-    if isinstance(hz, cp.ndarray):
+    if cp and isinstance(hz, cp.ndarray):
         return 2595 * cp.log10(1 + hz / 700)
     return 2595 * np.log10(1 + hz / 700)
 
@@ -263,15 +294,17 @@ def hz_to_bark(hz: ndarray|number) -> ndarray|number:
     --------
         bark = 13 * arctan(0.00076 * hz) + 3.5 * arctan((hz / 7500) ** 2)
     """
-    if isinstance(hz, cp.ndarray):
+    if cp and isinstance(hz, cp.ndarray):
         return 13 * cp.arctan(0.00076 * hz) + 3.5 * cp.arctan((hz / 7500) ** 2)
     return 13 * np.arctan(0.00076 * hz) + 3.5 * np.arctan((hz / 7500) ** 2)
 
 
 CPU_BARK_KEY = np.arange(0, 20000, 1) # Generate a range of frequencies from 0 to 20000 Hz
 CPU_BARK_KEY = hz_to_bark(CPU_BARK_KEY) # Convert the frequencies to the Bark scale
-GPU_BARK_KEY = cp.arange(0, 20000, 1) # Generate a range of frequencies from 0 to 20000 Hz on the GPU
-GPU_BARK_KEY = hz_to_bark(GPU_BARK_KEY) # Convert the frequencies to the Bark scale on the GPU
+GPU_BARK_KEY = None # Placeholder for the GPU Bark key, will be initialized if cupy is available
+if cp: # If cupy is available
+    GPU_BARK_KEY = cp.arange(0, 20000, 1) # Generate a range of frequencies from 0 to 20000 Hz on the GPU
+    GPU_BARK_KEY = hz_to_bark(GPU_BARK_KEY) # Convert the frequencies to the Bark scale on the GPU
 
 
 def bark_to_hz(bark: ndarray|number) -> ndarray|number:
@@ -289,7 +322,7 @@ def bark_to_hz(bark: ndarray|number) -> ndarray|number:
         return sp.optimize.root_scalar(lambda x: hz_to_bark(x) - single_bark, bracket=[0, 24000], method='brentq').root
     
     convert_to_cupy = False # Flag to convert the output back to cupy if the input was cupy
-    if isinstance(bark, cp.ndarray):
+    if cp and isinstance(bark, cp.ndarray):
         convert_to_cupy = True
         bark = bark.get() # Convert the cupy array to a numpy array
     
@@ -310,7 +343,7 @@ def bark_to_hz(bark: ndarray|number) -> ndarray|number:
     Returns:
         cp.ndarray|np.ndarray|float|int: The frequency value converted to Hertz. Return type matches the input signal type.
     """
-    if isinstance(bark, cp.ndarray):
+    if cp and isinstance(bark, cp.ndarray):
         return cp.digitize(bark, GPU_BARK_KEY) - 1
     return np.digitize(bark, CPU_BARK_KEY) - 1
     
@@ -350,7 +383,7 @@ def hz_to_erbs(hz: ndarray|number) -> ndarray|number:
     --------
         erb = 21.4 * log10(1 + hz * 0.00437)
     """
-    if isinstance(hz, cp.ndarray):
+    if cp and isinstance(hz, cp.ndarray):
         return 21.4 * cp.log10(1 + hz * 0.00437)
     return 21.4 * np.log10(1 + hz * 0.00437)
 
