@@ -140,9 +140,12 @@ def print_progress_bar(iteration: int,
     if treat_as_data: # Convert the iteration and length to human-readable data format if specified
         iteration: str = bytes_to_human_readable(iteration)
         max_iteration: str = bytes_to_human_readable(max_iteration)
-    if treat_as_time: # Convert the iteration and length to human-readable time format if specified
+    elif treat_as_time: # Convert the iteration and length to human-readable time format if specified
         iteration: str = time_to_human_readable(iteration)
         max_iteration: str = time_to_human_readable(max_iteration)
+    else: # If neither is specified, round the iteration and length to 3 decimal places
+        iteration: str = f'{iteration:.3f}'
+        max_iteration: str = f'{max_iteration:.3f}'
 
     # Get the color for the progress bar based on the percentage value using css hsl color format
     color = f'hsl({percentage_color_conversion(progress)}, 100%, 50%)'
