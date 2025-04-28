@@ -56,3 +56,14 @@ Ensure the `kaggle` CLI is installed and configured before attempting to downloa
 - Replace `python=3.9` with your preferred Python version if necessary.
 
 You're now ready to start working on the BirdCLEF+ 2025 project!
+
+
+## ToDo
+
+Efficency Improvements:
+
+1. torch has a builtin `torch.fft` which i would like to find out if has improvements over what `scipy.fft` is capable of. Possibly replace usage of the two
+2. torch has a builtin `torch.signal` which mostly includes windowing functions. reasearch which windowing functions seems most applicable and replace it with the existing system.
+3. build a system such that the model loads the audio and performs the fft all at once during the training process.
+
+4. pytorch has a builtin `torch.stft` for 2 dimensional data. could be processed potentially via convolution
